@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Color Palette Extractor</title>
+  <style>
+    :root { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --accent: #38bdf8; }
+    body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; padding: 2rem; margin: 0; }
+    .container { max-width: 720px; width: 100%; background: var(--card); padding: 2rem; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+    .drop-zone { border: 2px dashed #475569; border-radius: 8px; padding: 2rem; text-align: center; cursor: pointer; transition: border-color 0.2s; }
+    .drop-zone:hover { border-color: var(--accent); }
+    img { max-width: 100%; max-height: 320px; border-radius: 8px; margin-top: 1.5rem; display: none; object-fit: contain; }
+    .controls { margin: 1.5rem 0; display: flex; gap: 1rem; align-items: center; }
+    .palette { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 12px; margin-top: 1rem; }
+    .swatch { border-radius: 8px; overflow: hidden; background: #0f172a; cursor: pointer; transition: transform 0.15s; border: 1px solid #334155; }
+    .swatch:hover { transform: translateY(-3px); }
+    .color-box { height: 80px; width: 100%; }
+    .hex-label { padding: 8px; text-align: center; font-family: monospace; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🎨 Image Color Extractor</h2>
+    <div class="drop-zone" id="dropZone">
+      Click to upload or drag & drop an image here
+      <input type="file" id="fileInput" accept="image/*" hidden />
+    </div>
+
+    <div class="controls">
+      <label for="colorCount">Colors: <span id="countVal">6</span></label>
+      <input type="range" id="colorCount" min="2" max="12" value="6" />
+    </div>
+
+    <center><img id="preview" alt="Preview" /></center>
+    <div class="palette" id="palette"></div>
+  </div>
+
+  <canvas id="canvas" hidden></canvas>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const dropZone = document.getElementById('dropZone');
+    const preview = document.getElementById('preview');
+    const paletteDiv = document.getElementById('palette');
+    const colorCount = document.getElementById('colorCount');
+    const countVal = document.getElementById('countVal');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    let currentImg = null;
+
+    dropZone.onclick = () => fileInput.click();
+    dropZone.ondragover = (e) => { e.preventDefault(); dropZone.style.borderColor = '#38bdf8'; };
+    dropZone.ondragleave = () => { dropZone.style.borderColor = '#475569'; };
+    dropZone.ondrop = (e) => {
+      e.preventDefault();
+      if (e.dataTransfer.files[0]) loadImage(e.dataTransfer.files[0]);
+    };
+    fileInput.onchange = (e) => { if (e.target.files[0]) loadImage(e.target.files[0]); };
+    colorCount.oninput = () => {
+      countVal.textContent = colorCount.value;
+      if (currentImg) extractColors(currentImg, parseInt(colorCount.value));
+    };
+
+    function loadImage(file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          currentImg = img;
+          preview.src = img.src;
+          preview.style.display = 'block';
+          extractColors(img, parseInt(colorCount.value));
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Quantization via color bucketing & averaging
+    function extractColors(img, k) {
+      const maxDim = 150; // Downsample for fast processing
+      const scale = Math.min(maxDim / img.width, maxDim / img.height, 1);
+      canvas.width = Math.floor(img.width * scale);
+      canvas.height = Math.floor(img.height * scale);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      const buckets = {};
+
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i + 3] < 128) continue; // Skip transparent pixels
+        // Group similar colors into 24-unit buckets
+        const r = Math.round(data[i] / 24) * 24;
+        const g = Math.round(data[i + 1] / 24) * 24;
+        const b = Math.round(data[i + 2] / 24) * 24;
+        const key = `\${r},${g},${b}`;
+        if (!buckets[key]) buckets[key] = { r: 0, g: 0, b: 0, count: 0 };
+        buckets[key].r += data[i];
+        buckets[key].g += data[i + 1];
+        buckets[key].b += data[i + 2];
+        buckets[key].count++;
+      }
+
+      const sorted = Object.values(buckets)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, k)
+        .map(b => {
+          const r = Math.round(b.r / b.count);
+          const g = Math.round(b.g / b.count);
+          const bl = Math.round(b.b / b.count);
+          return "#" + [r, g, bl].map(x => Math.min(255, x).toString(16).padStart(2, '0')).join('').toUpperCase();
+        });
+
+      renderPalette(sorted);
+    }
+
+    function renderPalette(hexColors) {
+      paletteDiv.innerHTML = '';
+      hexColors.forEach(hex => {
+        const card = document.createElement('div');
+        card.className = 'swatch';
+        card.innerHTML = `<div class="color-box" style="background:\${hex}"></div><div class="hex-label">\${hex}</div>`;
+        card.onclick = () => {
+          navigator.clipboard.writeText(hex);
+          card.querySelector('.hex-label').textContent = 'Copied!';
+          setTimeout(() => card.querySelector('.hex-label').textContent = hex, 900);
+        };
+        paletteDiv.appendChild(card);
+      });
+    }
+  </script>
+</body>
+</html>
