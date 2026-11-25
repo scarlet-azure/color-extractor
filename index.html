@@ -1,135 +1,758 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id" class="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Color Palette Extractor</title>
+  <title>Chroma5 — Ekstraktor 5 Palet Warna Foto</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+        }
+      }
+    }
+  </script>
   <style>
-    :root { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --accent: #38bdf8; }
-    body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; padding: 2rem; margin: 0; }
-    .container { max-width: 720px; width: 100%; background: var(--card); padding: 2rem; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
-    .drop-zone { border: 2px dashed #475569; border-radius: 8px; padding: 2rem; text-align: center; cursor: pointer; transition: border-color 0.2s; }
-    .drop-zone:hover { border-color: var(--accent); }
-    img { max-width: 100%; max-height: 320px; border-radius: 8px; margin-top: 1.5rem; display: none; object-fit: contain; }
-    .controls { margin: 1.5rem 0; display: flex; gap: 1rem; align-items: center; }
-    .palette { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 12px; margin-top: 1rem; }
-    .swatch { border-radius: 8px; overflow: hidden; background: #0f172a; cursor: pointer; transition: transform 0.15s; border: 1px solid #334155; }
-    .swatch:hover { transform: translateY(-3px); }
-    .color-box { height: 80px; width: 100%; }
-    .hex-label { padding: 8px; text-align: center; font-family: monospace; font-size: 0.9rem; }
+    /* Transisi halus untuk perubahan tema dan kartu warna */
+    .swatch-card {
+      transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease;
+    }
+    .swatch-card:hover {
+      transform: translateY(-4px);
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-toast {
+      animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
   </style>
 </head>
-<body>
-  <div class="container">
-    <h2>🎨 Image Color Extractor</h2>
-    <div class="drop-zone" id="dropZone">
-      Click to upload or drag & drop an image here
-      <input type="file" id="fileInput" accept="image/*" hidden />
+<body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-300 selection:bg-indigo-500 selection:text-white">
+
+  <!-- Header / Navbar -->
+  <header class="border-b border-slate-200/80 dark:border-slate-800/80 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md sticky top-0 z-30">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-violet-500 to-amber-400 flex items-center justify-center shadow-md shadow-indigo-500/20">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg tracking-tight leading-none">Chroma<span class="text-indigo-600 dark:text-indigo-400">5</span></h1>
+          <p class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Ekstraktor Palet Warna Foto</p>
+        </div>
+      </div>
+
+      <!-- Tombol Ganti Tema Terang/Gelap -->
+      <button id="themeToggle" aria-label="Ubah tema" class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100/70 dark:bg-slate-800/70 hover:bg-slate-200/70 dark:hover:bg-slate-700/70 transition-colors">
+        <!-- Ikon Matahari (tampil saat dark mode) -->
+        <svg id="sunIcon" class="w-5 h-5 text-amber-400 hidden dark:block" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+        <!-- Ikon Bulan (tampil saat light mode) -->
+        <svg id="moonIcon" class="w-5 h-5 text-slate-700 block dark:hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+        </svg>
+      </button>
     </div>
+  </header>
 
-    <div class="controls">
-      <label for="colorCount">Colors: <span id="countVal">6</span></label>
-      <input type="range" id="colorCount" min="2" max="12" value="6" />
-    </div>
+  <!-- Konten Utama -->
+  <main class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-8">
+    
+    <!-- Bagian Atas: Unggah Foto & Preview -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+      
+      <!-- Kolom Kiri: Dropzone & Contoh Gambar -->
+      <div class="lg:col-span-5 flex flex-col justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-sm">
+        <div>
+          <h2 class="text-base font-semibold mb-1">Unggah Foto</h2>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">Pilih atau seret gambar untuk mendapatkan 5 warna paling dominan secara otomatis.</p>
 
-    <center><img id="preview" alt="Preview" /></center>
-    <div class="palette" id="palette"></div>
-  </div>
+          <!-- Area Drag & Drop -->
+          <div id="dropZone" tabindex="0" role="button" class="group relative border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 rounded-2xl p-6 text-center cursor-pointer transition-all bg-slate-50/60 dark:bg-slate-950/50 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/20">
+            <input type="file" id="fileInput" accept="image/*" class="hidden" />
+            <div class="w-12 h-12 mx-auto mb-3 rounded-2xl bg-indigo-100 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <p class="text-sm font-medium text-slate-700 dark:text-slate-200">
+              Seret foto ke sini, atau <span class="text-indigo-600 dark:text-indigo-400 underline underline-offset-2">pilih file</span>
+            </p>
+            <p class="text-xs text-slate-400 dark:text-slate-500 mt-1">Mendukung JPG, PNG, WEBP, GIF (Maks. 15MB)</p>
+          </div>
+        </div>
 
-  <canvas id="canvas" hidden></canvas>
+        <!-- Opsi Gambar Contoh Bawaan -->
+        <div class="mt-6 pt-5 border-t border-slate-200/80 dark:border-slate-800/80">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Atau Coba Contoh Gambar</span>
+            <button id="reExtractBtn" class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1" title="Acak ulang titik awal K-Means">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Ekstrak Ulang
+            </button>
+          </div>
+          <div id="sampleList" class="grid grid-cols-4 gap-2.5">
+            <!-- Thumbnail contoh gambar diisi melalui JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Kolom Kanan: Preview Gambar -->
+      <div class="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <h2 class="text-base font-semibold">Pratinjau Foto</h2>
+          </div>
+          <span id="imageMeta" class="text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg">
+            Siap memproses
+          </span>
+        </div>
+
+        <div class="relative flex-1 min-h-[240px] sm:min-h-[290px] rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200/70 dark:border-slate-800/70 flex items-center justify-center p-2">
+          <!-- Indikator Memproses -->
+          <div id="loadingOverlay" class="hidden absolute inset-0 bg-slate-950/60 backdrop-blur-xs z-10 flex flex-col items-center justify-center text-white gap-2">
+            <div class="w-8 h-8 border-3 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
+            <span class="text-xs font-medium tracking-wide">Menganalisis warna...</span>
+          </div>
+
+          <img id="previewImage" alt="Pratinjau gambar yang diunggah" class="max-h-[320px] w-auto max-w-full object-contain rounded-lg shadow-sm transition-opacity duration-300" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Bagian Bawah: Hasil 5 Palet Warna & Opsi Ekspor -->
+    <section class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-7 shadow-sm space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-bold tracking-tight">5 Palet Warna Dominan</h2>
+          <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Klik pada kode <span class="font-mono font-semibold text-slate-700 dark:text-slate-300">HEX</span> atau <span class="font-mono font-semibold text-slate-700 dark:text-slate-300">RGB</span> untuk menyalin warna ke papan klip.</p>
+        </div>
+
+        <!-- Tombol Aksi Ekspor -->
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="copyAllHexBtn" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shadow-indigo-600/20 transition-all flex items-center gap-1.5 cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            Salin Semua HEX
+          </button>
+
+          <button id="exportCssBtn" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-all flex items-center gap-1.5 cursor-pointer">
+            <svg class="w-4 h-4 text-sky-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+            </svg>
+            CSS Variables
+          </button>
+
+          <button id="exportJsonBtn" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-all flex items-center gap-1.5 cursor-pointer">
+            <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Ekspor JSON
+          </button>
+        </div>
+      </div>
+
+      <!-- Pratinjau Strip Gradien / Harmoni -->
+      <div id="paletteStrip" class="h-4 w-full rounded-full overflow-hidden flex shadow-inner bg-slate-200 dark:bg-slate-800">
+        <!-- 5 segmen warna akan dirender di sini -->
+      </div>
+
+      <!-- Grid 5 Kartu Palet Warna -->
+      <div id="paletteGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <!-- 5 kartu warna akan dirender oleh JavaScript -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="max-w-5xl w-full mx-auto px-4 sm:px-6 py-6 text-center text-xs text-slate-500 dark:text-slate-400 border-t border-slate-200/70 dark:border-slate-800/70">
+    Semua pemrosesan foto dilakukan 100% di peramban Anda (HTML5 Canvas & K-Means Clustering). Foto tidak pernah diunggah ke server mana pun.
+  </footer>
+
+  <!-- Canvas Tersembunyi untuk Analisis Piksel -->
+  <canvas id="workCanvas" class="hidden"></canvas>
+
+  <!-- Notifikasi Toast -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
   <script>
-    const fileInput = document.getElementById('fileInput');
+    /**
+     * Inisialisasi Elemen DOM & State Aplikasi
+     */
     const dropZone = document.getElementById('dropZone');
-    const preview = document.getElementById('preview');
-    const paletteDiv = document.getElementById('palette');
-    const colorCount = document.getElementById('colorCount');
-    const countVal = document.getElementById('countVal');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
+    const fileInput = document.getElementById('fileInput');
+    const previewImage = document.getElementById('previewImage');
+    const imageMeta = document.getElementById('imageMeta');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const paletteGrid = document.getElementById('paletteGrid');
+    const paletteStrip = document.getElementById('paletteStrip');
+    const sampleList = document.getElementById('sampleList');
+    const workCanvas = document.getElementById('workCanvas');
+    const ctx = workCanvas.getContext('2d', { willReadFrequently: true });
 
-    let currentImg = null;
+    let currentPalette = []; // Menyimpan objek { hex, rgb, r, g, b, percentage }
 
-    dropZone.onclick = () => fileInput.click();
-    dropZone.ondragover = (e) => { e.preventDefault(); dropZone.style.borderColor = '#38bdf8'; };
-    dropZone.ondragleave = () => { dropZone.style.borderColor = '#475569'; };
-    dropZone.ondrop = (e) => {
-      e.preventDefault();
-      if (e.dataTransfer.files[0]) loadImage(e.dataTransfer.files[0]);
-    };
-    fileInput.onchange = (e) => { if (e.target.files[0]) loadImage(e.target.files[0]); };
-    colorCount.oninput = () => {
-      countVal.textContent = colorCount.value;
-      if (currentImg) extractColors(currentImg, parseInt(colorCount.value));
-    };
+    /**
+     * Gambar Contoh Bawaan (dibuat secara prosedural menggunakan Canvas agar bebas CORS & tanpa ketergantungan eksternal)
+     */
+    const SAMPLE_THEMES = [
+      {
+        name: 'Senja Tropis',
+        draw: (c, w, h) => {
+          const g = c.createLinearGradient(0, 0, 0, h);
+          g.addColorStop(0, '#1e1b4b');
+          g.addColorStop(0.38, '#be185d');
+          g.addColorStop(0.65, '#f97316');
+          g.addColorStop(0.82, '#fde047');
+          g.addColorStop(1, '#0f172a');
+          c.fillStyle = g;
+          c.fillRect(0, 0, w, h);
+          // Matahari
+          c.fillStyle = '#fef08a';
+          c.beginPath();
+          c.arc(w * 0.5, h * 0.65, w * 0.14, 0, Math.PI * 2);
+          c.fill();
+          // Siluet bukit
+          c.fillStyle = '#090d16';
+          c.beginPath();
+          c.moveTo(0, h * 0.8);
+          c.quadraticCurveTo(w * 0.3, h * 0.68, w * 0.6, h * 0.82);
+          c.quadraticCurveTo(w * 0.85, h * 0.72, w, h * 0.85);
+          c.lineTo(w, h);
+          c.lineTo(0, h);
+          c.fill();
+        }
+      },
+      {
+        name: 'Hutan Zamrud',
+        draw: (c, w, h) => {
+          const g = c.createLinearGradient(0, 0, w, h);
+          g.addColorStop(0, '#064e3b');
+          g.addColorStop(0.5, '#10b981');
+          g.addColorStop(1, '#a7f3d0');
+          c.fillStyle = g;
+          c.fillRect(0, 0, w, h);
+          const circles = [
+            { x: 0.2, y: 0.3, r: 0.25, col: '#022c22' },
+            { x: 0.75, y: 0.25, r: 0.22, col: '#059669' },
+            { x: 0.5, y: 0.7, r: 0.3, col: '#34d399' },
+            { x: 0.85, y: 0.8, r: 0.2, col: '#fef3c7' }
+          ];
+          circles.forEach(item => {
+            c.fillStyle = item.col;
+            c.beginPath();
+            c.arc(w * item.x, h * item.y, w * item.r, 0, Math.PI * 2);
+            c.fill();
+          });
+        }
+      },
+      {
+        name: 'Samudra Karang',
+        draw: (c, w, h) => {
+          const g = c.createLinearGradient(0, 0, 0, h);
+          g.addColorStop(0, '#0284c7');
+          g.addColorStop(0.6, '#0d9488');
+          g.addColorStop(1, '#1e3a8a');
+          c.fillStyle = g;
+          c.fillRect(0, 0, w, h);
+          c.fillStyle = '#fb7185';
+          c.beginPath();
+          c.arc(w * 0.3, h * 0.75, w * 0.18, 0, Math.PI * 2);
+          c.fill();
+          c.fillStyle = '#fbbf24';
+          c.beginPath();
+          c.arc(w * 0.72, h * 0.68, w * 0.15, 0, Math.PI * 2);
+          c.fill();
+        }
+      },
+      {
+        name: 'Estetika Pastel',
+        draw: (c, w, h) => {
+          c.fillStyle = '#fdf2f8';
+          c.fillRect(0, 0, w, h);
+          const blocks = [
+            { x: 0, y: 0, w: 0.5, h: 0.55, col: '#f9a8d4' },
+            { x: 0.5, y: 0, w: 0.5, h: 0.45, col: '#93c5fd' },
+            { x: 0, y: 0.55, w: 0.45, h: 0.45, col: '#fde68a' },
+            { x: 0.45, y: 0.45, w: 0.55, h: 0.55, col: '#c4b5fd' }
+          ];
+          blocks.forEach(b => {
+            c.fillStyle = b.col;
+            c.fillRect(w * b.x, h * b.y, w * b.w, h * b.h);
+          });
+        }
+      }
+    ];
 
-    function loadImage(file) {
+    /**
+     * Membuat Data URL dari gambar contoh prosedural
+     */
+    function generateSampleDataURL(themeObj, width = 480, height = 320) {
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = width;
+      tempCanvas.height = height;
+      const tCtx = tempCanvas.getContext('2d');
+      themeObj.draw(tCtx, width, height);
+      return tempCanvas.toDataURL('image/png');
+    }
+
+    /**
+     * Merender 4 tombol thumbnail contoh gambar
+     */
+    function initSampleGallery() {
+      sampleList.innerHTML = '';
+      SAMPLE_THEMES.forEach((theme, idx) => {
+        const dataUrl = generateSampleDataURL(theme, 320, 220);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.title = `Coba tema: ${theme.name}`;
+        btn.className = 'group relative aspect-4/3 rounded-xl overflow-hidden border-2 border-transparent hover:border-indigo-500 focus:outline-none focus:border-indigo-500 transition-all cursor-pointer shadow-xs';
+        btn.innerHTML = `
+          <img src="${dataUrl}" alt="${theme.name}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
+          <span class="absolute inset-x-0 bottom-0 bg-black/55 text-[10px] text-white font-medium py-0.5 px-1 truncate">${theme.name}</span>
+        `;
+        btn.addEventListener('click', () => {
+          loadImageFromSource(generateSampleDataURL(theme, 640, 420), `Contoh: ${theme.name}`);
+        });
+        sampleList.appendChild(btn);
+      });
+    }
+
+    /**
+     * Menampilkan Notifikasi Toast
+     */
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      const bgClass = type === 'error'
+        ? 'bg-rose-600 text-white'
+        : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border border-slate-700/50 dark:border-slate-200';
+
+      toast.className = `animate-toast pointer-events-auto px-4 py-2.5 rounded-xl shadow-lg text-xs font-semibold flex items-center gap-2 ${bgClass}`;
+      toast.innerHTML = `
+        <svg class="w-4 h-4 text-emerald-400 dark:text-emerald-600 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+        <span>${message}</span>
+      `;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(8px)';
+        toast.style.transition = 'all 0.2s ease';
+        setTimeout(() => toast.remove(), 220);
+      }, 2200);
+    }
+
+    /**
+     * Menyalin teks ke clipboard dengan fallback execCommand agar aman di dalam iframe
+     */
+    function copyToClipboard(text, label = text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text)
+          .then(() => showToast(`Tersalin! (${label})`))
+          .catch(() => fallbackCopy(text, label));
+      } else {
+        fallbackCopy(text, label);
+      }
+    }
+
+    function fallbackCopy(text, label) {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        showToast(`Tersalin! (${label})`);
+      } catch (err) {
+        showToast('Gagal menyalin kode warna', 'error');
+      }
+      document.body.removeChild(textarea);
+    }
+
+    /**
+     * Memuat gambar ke elemen preview dan memulai ekstraksi K-Means
+     */
+    function loadImageFromSource(src, label = 'Gambar Unggahan') {
+      loadingOverlay.classList.remove('hidden');
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      img.onload = () => {
+        previewImage.src = src;
+        imageMeta.textContent = `${label} • ${img.naturalWidth}×${img.naturalHeight}px`;
+
+        // Beri jeda singkat agar UI sempat merender indikator loading
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            try {
+              const palette = extractDominantColorsKMeans(img, 5);
+              currentPalette = palette;
+              renderPalette(palette);
+            } catch (error) {
+              console.error(error);
+              showToast('Terjadi kesalahan saat menganalisis gambar.', 'error');
+            } finally {
+              loadingOverlay.classList.add('hidden');
+            }
+          }, 40);
+        });
+      };
+      img.onerror = () => {
+        loadingOverlay.classList.add('hidden');
+        showToast('Gagal memuat file gambar. Pastikan format valid.', 'error');
+      };
+      img.src = src;
+    }
+
+    /**
+     * Menangani file unggahan dari input atau drag-and-drop
+     */
+    function handleFileUpload(file) {
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        showToast('File harus berupa gambar (JPG, PNG, WEBP, dll).', 'error');
+        return;
+      }
+      if (file.size > 15 * 1024 * 1024) {
+        showToast('Ukuran gambar maksimal 15MB.', 'error');
+        return;
+      }
+
       const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          currentImg = img;
-          preview.src = img.src;
-          preview.style.display = 'block';
-          extractColors(img, parseInt(colorCount.value));
-        };
-        img.src = event.target.result;
+      reader.onload = (e) => {
+        loadImageFromSource(e.target.result, file.name);
       };
       reader.readAsDataURL(file);
     }
 
-    // Quantization via color bucketing & averaging
-    function extractColors(img, k) {
-      const maxDim = 150; // Downsample for fast processing
-      const scale = Math.min(maxDim / img.width, maxDim / img.height, 1);
-      canvas.width = Math.floor(img.width * scale);
-      canvas.height = Math.floor(img.height * scale);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    /**
+     * Algoritma Ekstraksi 5 Warna Dominan menggunakan K-Means++ Clustering
+     * Akurat, cepat, dan menghasilkan warna representatif dari gambar.
+     */
+    function extractDominantColorsKMeans(img, k = 5) {
+      // 1. Perkecil gambar pada canvas tersembunyi untuk kecepatan optimal (~120x120 piksel)
+      const maxDim = 120;
+      const scale = Math.min(maxDim / img.naturalWidth, maxDim / img.naturalHeight, 1);
+      const w = Math.max(1, Math.floor(img.naturalWidth * scale));
+      const h = Math.max(1, Math.floor(img.naturalHeight * scale));
 
-      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-      const buckets = {};
+      workCanvas.width = w;
+      workCanvas.height = h;
+      ctx.drawImage(img, 0, 0, w, h);
 
-      for (let i = 0; i < data.length; i += 4) {
-        if (data[i + 3] < 128) continue; // Skip transparent pixels
-        // Group similar colors into 24-unit buckets
-        const r = Math.round(data[i] / 24) * 24;
-        const g = Math.round(data[i + 1] / 24) * 24;
-        const b = Math.round(data[i + 2] / 24) * 24;
-        const key = `\${r},${g},${b}`;
-        if (!buckets[key]) buckets[key] = { r: 0, g: 0, b: 0, count: 0 };
-        buckets[key].r += data[i];
-        buckets[key].g += data[i + 1];
-        buckets[key].b += data[i + 2];
-        buckets[key].count++;
+      const imageData = ctx.getImageData(0, 0, w, h).data;
+      const pixels = [];
+
+      // 2. Kumpulkan piksel non-transparan
+      for (let i = 0; i < imageData.length; i += 4) {
+        const a = imageData[i + 3];
+        if (a < 128) continue; // Abaikan piksel transparan
+        pixels.push([imageData[i], imageData[i + 1], imageData[i + 2]]);
       }
 
-      const sorted = Object.values(buckets)
-        .sort((a, b) => b.count - a.count)
-        .slice(0, k)
-        .map(b => {
-          const r = Math.round(b.r / b.count);
-          const g = Math.round(b.g / b.count);
-          const bl = Math.round(b.b / b.count);
-          return "#" + [r, g, bl].map(x => Math.min(255, x).toString(16).padStart(2, '0')).join('').toUpperCase();
+      // Jika gambar kosong/transparan penuh
+      if (pixels.length === 0) {
+        return [
+          { r: 30, g: 41, b: 59 },
+          { r: 71, g: 85, b: 105 },
+          { r: 148, g: 163, b: 184 },
+          { r: 203, g: 213, b: 225 },
+          { r: 248, g: 250, b: 252 }
+        ].map(c => formatColorObject(c.r, c.g, c.b, 20));
+      }
+
+      // 3. Inisialisasi Centroid menggunakan K-Means++ agar warna tersebar merata & tidak terjebak di satu area
+      const centroids = [];
+      centroids.push([...pixels[Math.floor(Math.random() * pixels.length)]]);
+
+      while (centroids.length < k) {
+        const distances = pixels.map(p => {
+          let minDistSq = Infinity;
+          for (const c of centroids) {
+            const dr = p[0] - c[0];
+            const dg = p[1] - c[1];
+            const db = p[2] - c[2];
+            const dSq = dr * dr + dg * dg + db * db;
+            if (dSq < minDistSq) minDistSq = dSq;
+          }
+          return minDistSq;
         });
 
-      renderPalette(sorted);
-    }
+        const totalDist = distances.reduce((acc, d) => acc + d, 0);
+        if (totalDist === 0) {
+          centroids.push([...pixels[Math.floor(Math.random() * pixels.length)]]);
+          continue;
+        }
 
-    function renderPalette(hexColors) {
-      paletteDiv.innerHTML = '';
-      hexColors.forEach(hex => {
-        const card = document.createElement('div');
-        card.className = 'swatch';
-        card.innerHTML = `<div class="color-box" style="background:\${hex}"></div><div class="hex-label">\${hex}</div>`;
-        card.onclick = () => {
-          navigator.clipboard.writeText(hex);
-          card.querySelector('.hex-label').textContent = 'Copied!';
-          setTimeout(() => card.querySelector('.hex-label').textContent = hex, 900);
-        };
-        paletteDiv.appendChild(card);
+        let target = Math.random() * totalDist;
+        for (let i = 0; i < pixels.length; i++) {
+          target -= distances[i];
+          if (target <= 0) {
+            centroids.push([...pixels[i]]);
+            break;
+          }
+        }
+        if (centroids.length < k && centroids.length === distances.length) {
+          centroids.push([...pixels[0]]);
+        }
+      }
+
+      // 4. Iterasi K-Means (maksimal 14 iterasi untuk konvergensi cepat)
+      const assignments = new Int32Array(pixels.length);
+      const counts = new Int32Array(k);
+
+      for (let iter = 0; iter < 14; iter++) {
+        let changed = false;
+        const sums = Array.from({ length: k }, () => [0, 0, 0]);
+        counts.fill(0);
+
+        for (let i = 0; i < pixels.length; i++) {
+          const p = pixels[i];
+          let bestCluster = 0;
+          let minDist = Infinity;
+
+          for (let j = 0; j < k; j++) {
+            const c = centroids[j];
+            const dr = p[0] - c[0];
+            const dg = p[1] - c[1];
+            const db = p[2] - c[2];
+            const dist = dr * dr + dg * dg + db * db;
+            if (dist < minDist) {
+              minDist = dist;
+              bestCluster = j;
+            }
+          }
+
+          if (assignments[i] !== bestCluster) {
+            assignments[i] = bestCluster;
+            changed = true;
+          }
+
+          sums[bestCluster][0] += p[0];
+          sums[bestCluster][1] += p[1];
+          sums[bestCluster][2] += p[2];
+          counts[bestCluster]++;
+        }
+
+        for (let j = 0; j < k; j++) {
+          if (counts[j] > 0) {
+            centroids[j][0] = sums[j][0] / counts[j];
+            centroids[j][1] = sums[j][1] / counts[j];
+            centroids[j][2] = sums[j][2] / counts[j];
+          }
+        }
+
+        if (!changed) break;
+      }
+
+      // 5. Susun hasil berdasarkan dominasi (persentase piksel terbanyak ke terkecil)
+      const clusters = centroids.map((c, idx) => ({
+        r: Math.round(c[0]),
+        g: Math.round(c[1]),
+        b: Math.round(c[2]),
+        count: counts[idx]
+      }));
+
+      clusters.sort((a, b) => b.count - a.count);
+
+      const totalPixels = pixels.length;
+      return clusters.map(c => {
+        const pct = Math.max(1, Math.round((c.count / totalPixels) * 100));
+        return formatColorObject(c.r, c.g, c.b, pct);
       });
     }
+
+    /**
+     * Format data warna ke HEX, RGB, dan hitung kontras teks
+     */
+    function formatColorObject(r, g, b, percentage) {
+      const clamp = (v) => Math.max(0, Math.min(255, v));
+      const rr = clamp(r), gg = clamp(g), bb = clamp(b);
+      const hex = '#' + [rr, gg, bb].map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase();
+      const rgb = `rgb(${rr}, ${gg}, ${bb})`;
+      // Luminansi relatif untuk menentukan apakah teks di atas warna sebaiknya putih atau hitam
+      const luminance = (0.299 * rr + 0.587 * gg + 0.114 * bb) / 255;
+      const isLight = luminance > 0.62;
+      return { r: rr, g: gg, b: bb, hex, rgb, percentage, isLight };
+    }
+
+    /**
+     * Merender 5 kartu palet warna dan strip proporsi
+     */
+    function renderPalette(palette) {
+      paletteGrid.innerHTML = '';
+      paletteStrip.innerHTML = '';
+
+      palette.forEach((color, index) => {
+        // Segmen pada strip proporsi
+        const seg = document.createElement('div');
+        seg.style.backgroundColor = color.hex;
+        seg.style.width = `${Math.max(color.percentage, 8)}%`;
+        seg.title = `${color.hex} (${color.percentage}%)`;
+        seg.className = 'h-full transition-all duration-500';
+        paletteStrip.appendChild(seg);
+
+        // Kartu Palet Warna
+        const card = document.createElement('div');
+        card.className = 'swatch-card rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 flex flex-col shadow-xs';
+
+        const badgeTextClass = color.isLight ? 'text-slate-900 bg-white/65' : 'text-white bg-black/35';
+
+        card.innerHTML = `
+          <!-- Kotak Preview Warna (Klik untuk salin HEX) -->
+          <div data-copy="${color.hex}" class="copy-trigger relative h-28 sm:h-32 w-full cursor-pointer group flex items-end justify-between p-3" style="background-color: ${color.hex};">
+            <span class="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-md backdrop-blur-xs ${badgeTextClass}">
+              #${index + 1} • ${color.percentage}%
+            </span>
+            <span class="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] font-semibold px-2 py-1 rounded-lg backdrop-blur-xs ${badgeTextClass} flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              Salin
+            </span>
+          </div>
+
+          <!-- Detail Kode Warna -->
+          <div class="p-3 space-y-1.5">
+            <!-- Tombol Salin HEX -->
+            <button type="button" data-copy="${color.hex}" class="copy-trigger w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 border border-slate-200/80 dark:border-slate-800 text-left transition-colors cursor-pointer group">
+              <span class="font-mono text-xs sm:text-sm font-bold tracking-wide">${color.hex}</span>
+              <span class="text-[10px] font-medium text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">HEX</span>
+            </button>
+
+            <!-- Tombol Salin RGB -->
+            <button type="button" data-copy="${color.rgb}" class="copy-trigger w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 border border-slate-200/80 dark:border-slate-800 text-left transition-colors cursor-pointer group">
+              <span class="font-mono text-[11px] text-slate-600 dark:text-slate-300 truncate">${color.rgb}</span>
+              <span class="text-[10px] font-medium text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">RGB</span>
+            </button>
+          </div>
+        `;
+
+        paletteGrid.appendChild(card);
+      });
+
+      // Pasang event listener salin pada setiap elemen pemicu
+      document.querySelectorAll('.copy-trigger').forEach(el => {
+        el.addEventListener('click', () => {
+          const val = el.getAttribute('data-copy');
+          if (val) copyToClipboard(val, val);
+        });
+      });
+    }
+
+    /**
+     * Event Listener Unggah File, Drag & Drop, Tema, dan Ekspor
+     */
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        fileInput.click();
+      }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        handleFileUpload(e.target.files[0]);
+      }
+    });
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('border-indigo-500', 'bg-indigo-50/50', 'dark:bg-indigo-950/30');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('border-indigo-500', 'bg-indigo-50/50', 'dark:bg-indigo-950/30');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('border-indigo-500', 'bg-indigo-50/50', 'dark:bg-indigo-950/30');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        handleFileUpload(e.dataTransfer.files[0]);
+      }
+    });
+
+    // Ekstrak ulang (untuk variasi titik awal K-Means)
+    document.getElementById('reExtractBtn').addEventListener('click', () => {
+      if (previewImage.src) {
+        loadImageFromSource(previewImage.src, imageMeta.textContent.split(' • ')[0]);
+      }
+    });
+
+    // Salin semua HEX sekaligus
+    document.getElementById('copyAllHexBtn').addEventListener('click', () => {
+      if (!currentPalette.length) return;
+      const allHex = currentPalette.map(c => c.hex).join(', ');
+      copyToClipboard(allHex, 'Semua 5 HEX');
+    });
+
+    // Salin sebagai CSS Variables
+    document.getElementById('exportCssBtn').addEventListener('click', () => {
+      if (!currentPalette.length) return;
+      const cssVars = `:root {\n${currentPalette.map((c, i) => `  --color-palette-${i + 1}: ${c.hex}; /* ${c.rgb} */`).join('\n')}\n}`;
+      copyToClipboard(cssVars, 'CSS Variables');
+    });
+
+    // Unduh file JSON palet warna
+    document.getElementById('exportJsonBtn').addEventListener('click', () => {
+      if (!currentPalette.length) return;
+      const payload = {
+        sumber: 'Chroma5 Ekstraktor Palet Warna',
+        jumlahWarna: currentPalette.length,
+        palet: currentPalette.map((c, idx) => ({
+          urutan: idx + 1,
+          hex: c.hex,
+          rgb: { r: c.r, g: c.g, b: c.b },
+          dominasiPersen: c.percentage
+        }))
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'palet-5-warna.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('File palet-5-warna.json berhasil diunduh!');
+    });
+
+    // Toggle Tema Terang / Gelap
+    document.getElementById('themeToggle').addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+    });
+
+    // Inisialisasi Awal saat halaman dimuat
+    window.addEventListener('DOMContentLoaded', () => {
+      initSampleGallery();
+      // Muat tema contoh pertama secara otomatis agar pengguna langsung melihat cara kerjanya
+      const defaultTheme = SAMPLE_THEMES[0];
+      loadImageFromSource(generateSampleDataURL(defaultTheme, 640, 420), `Contoh: ${defaultTheme.name}`);
+    });
   </script>
 </body>
 </html>
